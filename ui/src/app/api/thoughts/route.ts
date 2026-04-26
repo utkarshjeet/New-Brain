@@ -5,7 +5,7 @@ export async function GET() {
   try {
     const auth = new google.auth.JWT({
       email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      key: process.env.GOOGLE_PRIVATE_KEY,
+      key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n').replace(/"/g, ''),
       scopes: ['https://www.googleapis.com/auth/spreadsheets']
     });
 
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
     const auth = new google.auth.JWT({
       email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      key: process.env.GOOGLE_PRIVATE_KEY,
+      key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n').replace(/"/g, ''),
       scopes: ['https://www.googleapis.com/auth/spreadsheets']
     });
 
