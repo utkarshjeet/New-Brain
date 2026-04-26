@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { BrainCircuit, RefreshCcw, Sparkles, AlertCircle, FileText, CalendarDays, Plus, Tag } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { BrainCircuit, RefreshCcw, Sparkles, AlertCircle, FileText, CalendarDays, Plus, Tag, ImagePlus } from "lucide-react";
 
 export default function Dashboard() {
   const [thoughts, setThoughts] = useState<any[]>([]);
@@ -16,6 +16,10 @@ export default function Dashboard() {
   const [newThought, setNewThought] = useState("");
   const [newCategory, setNewCategory] = useState("");
   const [isPosting, setIsPosting] = useState(false);
+
+  // Image Upload State
+  const [isExtracting, setIsExtracting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchThoughts = async () => {
     try {
@@ -33,6 +37,42 @@ export default function Dashboard() {
   useEffect(() => {
     fetchThoughts();
   }, []);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsExtracting(true);
+    setStatus("Extracting text from image using Gemini Vision...");
+    
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async () => {
+        const base64 = (reader.result as string).split(',')[1];
+        
+        const res = await fetch("/api/ocr", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ imageBase64: base64, mimeType: file.type })
+        });
+        
+        const data = await res.json();
+        if (data.text) {
+          setNewThought(prev => prev ? `${prev}\n\n${data.text}` : data.text);
+          setStatus("Text extracted successfully!");
+        } else {
+          setStatus("Could not extract any text from the image.");
+        }
+      };
+    } catch(err) {
+      setStatus("Failed to process image.");
+    } finally {
+      setIsExtracting(false);
+      setTimeout(() => setStatus(""), 4000);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const handleProcess = async () => {
     setProcessing(true);
@@ -135,16 +175,35 @@ export default function Dashboard() {
               onChange={(e) => setNewThought(e.target.value)}
             />
             <div className="flex flex-col sm:flex-row gap-4 justify-between sm:items-center">
-              <div className="relative">
-                <Tag size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
-                <input
-                  type="text"
-                  placeholder="Category (optional)"
-                  className="bg-neutral-950 border border-white/10 rounded-xl py-2 pl-9 pr-4 text-sm text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-                  value={newCategory}
-                  onChange={(e) => setNewCategory(e.target.value)}
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="relative flex-1 sm:flex-none sm:w-56">
+                  <Tag size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                  <input
+                    type="text"
+                    placeholder="Category (optional)"
+                    className="w-full bg-neutral-950 border border-white/10 rounded-xl py-2 pl-9 pr-4 text-sm text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                    value={newCategory}
+                    onChange={(e) => setNewCategory(e.target.value)}
+                  />
+                </div>
+                
+                <input 
+                  type="file" 
+                  accept="image/*" 
+                  className="hidden" 
+                  ref={fileInputRef} 
+                  onChange={handleImageUpload} 
                 />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isExtracting}
+                  title="Upload image to extract text"
+                  className="p-2 bg-neutral-950 hover:bg-neutral-800 border border-white/10 rounded-xl text-neutral-400 hover:text-indigo-400 transition-colors disabled:opacity-50 flex items-center justify-center shrink-0"
+                >
+                  {isExtracting ? <RefreshCcw className="animate-spin" size={18} /> : <ImagePlus size={18} />}
+                </button>
               </div>
+              
               <button
                 onClick={handlePostThought}
                 disabled={isPosting || !newThought.trim()}
